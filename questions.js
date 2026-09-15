@@ -1,0 +1,5 @@
+const words=['zero','one','two','three','four','five','six','seven','eight','nine','ten'];
+export {words};
+export const questions=[['cat','cats',3,10,1],['rooster','roosters',4,10,2],['donkey','donkeys',5,10,3],['pig','pigs',7,10,4],['horse','horses',9,11,5],['dog','dogs',2,11,6],['goat','goats',1,11,7],['bull','bulls',10,11,8]].map(([animal,plural,count,page,item])=>({id:`v4-p${page}-${item}`,animal,plural,count,prompt:`How many ${plural} do you see?`,spokenPrompt:`How many ${plural} do you see?`,answer:`I see ${words[count]} ${count===1?animal:plural}.`,skill:'visual-counting-and-question-comprehension',source:{book:'V4',page,item,sourceFile:'../V4_book_pictures/V4_10-11.webp'},verification:'verified',image:null,audio:null}));
+
+export function randomQuestions(length){const pool=questions.flatMap(q=>Array.from({length:10},(_,i)=>{const count=i+1;return {...q,id:`v4-extension-${q.animal}-${count}`,count,answer:`I see ${words[count]} ${count===1?q.animal:q.plural}.`,verification:"verified-extension",extension:true}}));for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}return pool.slice(0,length)}
