@@ -1,7 +1,133 @@
-<!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>牧場救援隊 · V4 3D</title><link rel="stylesheet" href="style.css"></head>
-<body><header><a class="brand" href="./">牧場救援隊 <small>Farm Rescue</small></a><span id="progress">V4 · Lesson 4 · p.10–11</span><button id="fullscreen">全螢幕</button></header>
-<main><section id="world" aria-label="可旋轉的 3D 動物牧場"><div id="scene"></div><div class="scene-label">數一數，讓動物平安回家。</div><div class="view-tools"><button id="left" aria-label="向左轉動牧場">↶ 左轉</button><button id="homeview">正面</button><button id="right" aria-label="向右轉動牧場">右轉 ↷</button></div><p id="render-error" hidden></p></section>
-<aside id="menu"><p class="eyebrow">全班合作 × 分隊接力</p><h1>小小牧場，<br>一起來救援！</h1><p class="intro">看牧場、數動物、說英語。<br>每一隊都是動物的好幫手。</p><ol><li>全班數一數，用手指比出數量。</li><li>當輪隊伍派代表選答案。</li><li>全隊說完整句，老師帶領下一關。</li></ol><div class="settings"><label>出題 <select id="mode"><option value="textbook">課本原題</option><option value="random">隨機練習 · 80 種組合</option></select></label><label>隊伍 <select id="teams"><option value="2">2 隊</option><option value="3">3 隊</option><option value="4">4 隊</option></select></label><label>題數 <select id="rounds"><option value="8">8 題 · 完整單元</option><option value="4">4 題 · 短練習</option><option value="16">16 題 · 隨機模式</option></select></label><label>提示 <select id="hints"><option value="show">顯示英文題目</option><option value="hide">聽力挑戰 · 隱藏題目</option></select></label></div><button id="start" class="primary">出發，救援動物 →</button><p class="muted">適合投影／觸控大螢幕 · 不限時<br>鍵盤 1、2、3 選答案，R 重播，P 暫停</p><details><summary>教材與課堂安排</summary><p>V4 第 10–11 頁，8 組原課本數量問答。動物為遊戲自製立體模型。建議全班分隊、原地比手勢，輪流派代表操作。口說由老師確認，沒有自動發音評分。</p></details></aside>
-<aside id="play" hidden><div id="scores"></div><div class="turn" id="turn"></div><h2 id="question"></h2><div class="audio-tools"><button id="replay">▶ 重播題目</button><button id="pause">暫停</button><button id="mute" aria-pressed="false">語音：開</button></div><p id="audio-status" class="muted" role="status"></p><p class="instruction" id="instruction">一起數一數，再請代表選答案。</p><div id="answers"></div><div id="feedback" aria-live="polite"></div><button id="next" class="primary" hidden>老師確認：已跟讀，下一題 →</button><button id="skip-speech" hidden>尚未跟讀，先前進</button><p id="source" class="muted"></p><button id="restart" class="text-button">結束本輪，回到設定</button></aside>
-<aside id="results" hidden><p class="eyebrow">救援完成</p><h1>全班的力量，<br>讓牧場亮起來。</h1><div id="report"></div><button id="again" class="primary">再玩一輪 →</button><button id="review">練習本輪錯題</button><p class="muted">首次答對率記錄數量理解；跟讀次數是教師確認紀錄。</p></aside></main><footer><span>看一看 → 數一數 → 說一說</span><span>V4 · How many do you see?</span></footer><script type="module" src="game.js"></script></body></html>
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Farm Rescue 3D · 牧場救援大冒險 (V4 3D ESL Game)</title>
+  <meta name="description" content="ALICE ESL V4 Lesson 4 專屬 3D 互動牧場救援英語遊戲，結合視覺數量計數、問答句型與分組合作教學。">
+  <link rel="icon" href="data:,">
+  
+  <!-- 外部樣式表與 Google Fonts -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- 外部動畫與特效庫 (Canvas Confetti, GSAP) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+
+  <!-- 全螢幕 3D 畫布容器 -->
+  <div id="scene-container"></div>
+  <div id="viewport-fx"></div>
+
+  <!-- 主機級 3D 遊戲 HUD 覆蓋層 -->
+  <div class="game-hud">
+    
+    <!-- 頂部導航狀態列 -->
+    <header class="hud-header">
+      <!-- 品牌標題 -->
+      <div class="hud-brand hud-interactive">
+        <span class="brand-icon">🚜</span>
+        <div class="brand-title">FARM RESCUE 3D</div>
+        <span class="brand-sub">V4 · p.10–11</span>
+      </div>
+
+      <!-- 中央題目問題橫幅 -->
+      <div class="hud-question-capsule hud-interactive" id="question-capsule">
+        <div class="question-text" id="question-text">How many animals do you see?</div>
+        <button class="question-replay-btn" id="btn-replay-question">
+          <span>📢 聽題目 (R)</span>
+        </button>
+      </div>
+
+      <!-- 右側題目進度與控制群組 -->
+      <div class="hud-controls-group hud-interactive">
+        <div class="hud-pill highlight" id="progress-pill">救援進度 1 / 8</div>
+        <button class="hud-btn" id="btn-mute" title="語音開關">♫</button>
+        <button class="hud-btn" id="btn-pause" title="暫停遊戲">Ⅱ</button>
+        <button class="hud-btn" id="btn-fullscreen" title="全螢幕切換">⛶</button>
+      </div>
+    </header>
+
+    <!-- 隊伍計分展示欄 (2-4 隊動態切換) -->
+    <div class="team-scoreboard hud-interactive" id="team-scoreboard">
+      <!-- 由 JS 動態生成隊伍指示膠囊 -->
+    </div>
+
+    <!-- 底部操作區：3D 視角羅盤 + 巨大 3D 數字答案卡 + 教師跟讀確認列 -->
+    <div class="hud-bottom-area">
+      <!-- 視角羅盤 -->
+      <div class="view-compass hud-interactive">
+        <button class="compass-btn" id="btn-cam-left">↶ 轉向左</button>
+        <button class="compass-btn" id="btn-cam-center">正面</button>
+        <button class="compass-btn" id="btn-cam-right">右轉 ↷</button>
+      </div>
+
+      <!-- 中央巨大 3D 數字答案卡 -->
+      <div class="answers-container hud-interactive" id="answers-deck">
+        <!-- 由 JS 動態生成 3 張巨型 3D 答案卡牌 -->
+      </div>
+
+      <!-- 右側教師跟讀確認欄 -->
+      <div class="teacher-action-bar hud-interactive" id="teacher-bar" hidden>
+        <button class="btn-confirm-speech" id="btn-speech-ok">老師確認：已跟讀 →</button>
+        <button class="btn-skip-speech" id="btn-speech-skip">跳過跟讀，先前進</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 回饋 Toast 特效 (答對 / 答錯) -->
+  <div class="feedback-toast" id="feedback-toast">🎉 EXCELLENT! I see 3 cats.</div>
+
+  <!-- 全螢幕遊戲彈跳視窗 (歡迎、暫停、結算) -->
+  <div id="modal-overlay">
+    <div class="game-modal" id="modal-content">
+      <span class="modal-badge">ALICE ESL V4 ADVENTURE</span>
+      <h2 class="modal-title">小小牧場，一起來救援！</h2>
+      <p class="modal-desc">
+        轉動立體牧場、點擊動物一起數一數！<br>
+        各小隊派出代表按下正確數字，並大聲說出完整句：<br>
+        <b>"I see... [number] [animals]!"</b>
+      </p>
+
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>模式選擇</label>
+          <select class="setting-select" id="setting-mode">
+            <option value="textbook">課本原題（8 組精選）</option>
+            <option value="random">隨機練習（80 組擴展）</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>競賽隊伍</label>
+          <select class="setting-select" id="setting-teams">
+            <option value="2">2 隊（向日葵 / 小河）</option>
+            <option value="3">3 隊（向日葵 / 小河 / 橡樹）</option>
+            <option value="4">4 隊（四隊合作大挑戰）</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>挑戰題數</label>
+          <select class="setting-select" id="setting-rounds">
+            <option value="8">8 題 · 完整單元</option>
+            <option value="4">4 題 · 快速熱身</option>
+            <option value="16">16 題 · 深度挑戰</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>提示等級</label>
+          <select class="setting-select" id="setting-hints">
+            <option value="show">顯示英文題目看板</option>
+            <option value="hide">聽力挑戰（隱藏看板文字）</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-start-game" id="btn-start-play">出發，拯救牧場動物 →</button>
+    </div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>

@@ -1,24 +1,348 @@
-import {questions,words,randomQuestions} from './questions.js';
-import {createFarm} from './scene.js';
-const $=id=>document.getElementById(id);let farm;
-try{farm=createFarm()}catch(e){$('render-error').hidden=false;$('render-error').textContent='無法啟動 3D。請以支援 WebGL 的 Chrome／Edge 開啟，並確認硬體加速已啟用。';$('start').disabled=true;console.error(e)}
-let state='menu',previous='',deck=[],index=0,scores=[],attempts=0,records=[],muted=false,choices=[],teamCount=2,showText=true;
-const names=['向日葵隊','小河隊','橡樹隊','草莓隊'];
-let activeAudio=null,audioGeneration=0;
-const audioMap=fetch('./audio/manifest.json').then(r=>r.json()).then(m=>new Map(m.entries.filter(e=>e.status==='ready').map(e=>[e.text,e.file]))).catch(()=>new Map());
-function stopSpeech(){audioGeneration++;if(activeAudio){activeAudio.pause();activeAudio.currentTime=0;activeAudio=null}}
-async function speak(text){stopSpeech();const generation=audioGeneration;$('audio-status').textContent='';if(muted)return;const map=await audioMap;if(generation!==audioGeneration)return;const path=map.get(text);if(!path){$('audio-status').textContent='此句音檔尚未備妥，請老師朗讀。';$('question').textContent=deck[index]?.prompt||text;return}const audio=new Audio(path);activeAudio=audio;try{await audio.play()}catch{if(generation===audioGeneration){$('audio-status').textContent='音檔播放失敗，請按重播，或由老師朗讀。';$('question').textContent=deck[index]?.prompt||text;}}}
-function panel(id){for(const x of ['menu','play','results'])$(x).hidden=x!==id}
-function scoreBoard(){const team=index%teamCount;$('scores').replaceChildren(...scores.map((s,i)=>{const e=document.createElement('span');e.className='score'+(i===team?' active':'');e.textContent=`${names[i]} ${s} ★`;return e}));$('turn').textContent=`${names[team]} · 請派代表`}
-function start(custom){stopSpeech();teamCount=Number($('teams').value);showText=$('hints').value==='show';deck=custom||($('mode').value==='random'?randomQuestions(Number($('rounds').value)):questions.slice(0,Number($('rounds').value)));index=0;scores=Array(teamCount).fill(0);records=[];document.body.classList.remove('paused');farm?.pause(false);panel('play');load()}
-function load(){state='playing';attempts=0;stopSpeech();$('pause').textContent='暫停';$('feedback').textContent='';$('next').hidden=true;$('skip-speech').hidden=true;$('instruction').textContent='一起數一數，再請代表選答案。';const q=deck[index];$('question').textContent=(showText||muted)?q.prompt:'仔細聽：問了哪些動物？';$('source').textContent=q.extension?`教材延伸：V4 第 10–11 頁句型 · 隨機數量`:`教材：V4 第 ${q.source.page} 頁 · 第 ${q.source.item} 題`;$('progress').textContent=`救援進度 ${index+1} / ${deck.length}`;scoreBoard();farm?.populate(q.animal,q.count);
- const alternatives=Array.from({length:10},(_,i)=>i+1).filter(n=>n!==q.count).sort((a,b)=>Math.abs(a-q.count)-Math.abs(b-q.count));choices=[q.count,...alternatives.slice(0,2)];const rotate=(index+1)%3;choices=choices.slice(rotate).concat(choices.slice(0,rotate));$('answers').replaceChildren(...choices.map((n,i)=>{const b=document.createElement('button');b.dataset.value=n;b.setAttribute('aria-label',`${n} ${words[n]}`);b.innerHTML=`${n}<small>${words[n]}</small><small class="key">按鍵 ${i+1}</small>`;b.onclick=()=>answer(n);return b}));speak(q.spokenPrompt)}
-function answer(n){if(state!=='playing')return;attempts++;const q=deck[index];if(n!==q.count){$('feedback').textContent='再看仔細一點，一起數一次！';$('instruction').textContent='可以轉動牧場，找找是否漏數。';return}state='feedback';scores[index%teamCount]++;records.push({id:q.id,firstCorrect:attempts===1,attempts,spoken:false,team:index%teamCount});scoreBoard();for(const b of $('answers').children)b.disabled=true;$('feedback').textContent=q.answer;$('instruction').textContent='全隊一起說這句！老師聽完後再前進。';$('next').hidden=false;$('skip-speech').hidden=false;farm?.celebrate();speak(q.answer)}
-function next(spoken){if(state!=='feedback')return;records[records.length-1].spoken=spoken;stopSpeech();index++;if(index<deck.length)load();else finish()}
-function finish(){state='results';panel('results');$('progress').textContent='本輪救援完成';const correct=records.filter(r=>r.firstCorrect).length;$('report').replaceChildren();for(const text of [`完成 ${records.length} 題救援`,`首次答對 ${correct} / ${records.length}（${Math.round(correct/records.length*100)}%）`,`老師確認跟讀 ${records.filter(r=>r.spoken).length} 題`,...scores.map((s,i)=>`${names[i]}：${s} 顆合作星`)]){const p=document.createElement('p');p.textContent=text;$('report').append(p)}$('review').disabled=records.every(r=>r.firstCorrect)}
-function togglePause(){if(!['playing','feedback','paused'].includes(state))return;if(state==='paused'){state=previous;farm?.pause(false);document.body.classList.remove('paused');$('pause').textContent='暫停';$('question').textContent=(showText||muted)?deck[index].prompt:'仔細聽：問了哪些動物？';$('feedback').textContent=state==='feedback'?deck[index].answer:''}else{previous=state;state='paused';stopSpeech();farm?.pause(true);document.body.classList.add('paused');$('pause').textContent='繼續';$('question').textContent='休息一下，等老師說開始。';$('feedback').textContent='已暫停'}for(const b of $('answers').children)b.disabled=state!=='playing';$('next').disabled=state==='paused';$('skip-speech').disabled=state==='paused'}
-function menu(){state='menu';stopSpeech();document.body.classList.remove('paused');farm?.pause(false);panel('menu');$('progress').textContent='V4 · Lesson 4 · p.10–11';$('next').disabled=false;$('skip-speech').disabled=false;farm?.populate('pig',7)}
-$('start').onclick=()=>start();$('next').onclick=()=>next(true);$('skip-speech').onclick=()=>next(false);$('again').onclick=menu;$('restart').onclick=menu;$('review').onclick=()=>{const ids=new Set(records.filter(r=>!r.firstCorrect).map(r=>r.id));start(deck.filter(q=>ids.has(q.id)))};$('replay').onclick=()=>{if(['playing','feedback'].includes(state))speak(deck[index].spokenPrompt)};$('pause').onclick=togglePause;$('mute').onclick=()=>{muted=!muted;stopSpeech();$('mute').textContent=`語音：${muted?'關':'開'}`;$('mute').setAttribute('aria-pressed',String(muted));if(muted&&!showText&&state==='playing')$('question').textContent=deck[index].prompt};$('left').onclick=()=>farm?.rotate(-.18);$('right').onclick=()=>farm?.rotate(.18);$('homeview').onclick=()=>farm?.resetView();$('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch{$('fullscreen').textContent='請按 F11 全螢幕'}};
-document.addEventListener('keydown',e=>{if(e.repeat||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if(['1','2','3'].includes(e.key))answer(choices[Number(e.key)-1]);if(e.key.toLowerCase()==='r')$('replay').click();if(e.key.toLowerCase()==='p')togglePause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&['playing','feedback'].includes(state))togglePause()});
-// Read-only diagnostics for classroom support and reproducible QA.
-window.render_game_to_text=()=>JSON.stringify({state,index,total:deck.length,question:deck[index]?.id,scores,records,scene:farm?.stats()});
+/**
+ * FARM RESCUE 3D · 遊戲核心狀態機與音效控制
+ * 遵照《兒童美語 3D 互動遊戲開發指南與 GPT6-Astra 提示詞庫》重構：
+ * 1. ZzFX 即時輕量合成音效（按鍵泡泡音、答對升調和弦、答錯彈簧音、點擊動物音）
+ * 2. 88 個 Google Cloud Chirp 3 HD MP3 本地音訊無縫集成
+ * 3. 滿版 3D 遊戲 HUD 狀態展示、分隊輪流挑戰與教師確認跟讀機制
+ */
+
+import { questions, words, randomQuestions } from './questions.js';
+import { createFarm } from './scene.js';
+
+const $ = id => document.getElementById(id);
+
+// ==========================================
+// 1. ZzFX 超輕量合成音效模組 (< 1KB)
+// ==========================================
+let isMuted = false;
+const zzfx = (p=1,k=.05,b=220,e=0,r=0,t=.1,q=0,D=1,u=0,y=0,v=0,z=0,l=0,E=0,A=0,F=0,c=0,w=1,m=0,B=0)=>{
+  if (isMuted) return;
+  try {
+    let M=Math,R=44100,d=2*M.PI,G=u*=500*d/R/R,C=b*=(1-k+2*k*M.random(k=[]))*d/R,g=0,c1=0,a=0,f=1,h=0,
+    n=0,q1=new (window.AudioContext||window.webkitAudioContext);
+    let S=q1.createBuffer(1,R*t,R),L=S.getChannelData(0);
+    for(;n<R*t;L[n++]=a)a=M.sin(g)*f,f=n<R*e?n/(R*e):n<R*(e+r)?1-(n-R*e)/(R*r)*(1-D):n<R*(t-c)?D:(t-n/R)/c*D,
+    g+=C,C+=G;let p1=q1.createBufferSource();p1.buffer=S;p1.connect(q1.destination);p1.start();
+  } catch(e) {}
+};
+
+const SFX = {
+  click: () => zzfx(1, 0.05, 480, 0.01, 0.04, 0.08, 1, 1, 6),
+  animalBoing: () => zzfx(1, 0.05, 360, 0.02, 0.12, 0.16, 1, 1.6, -5),
+  correct: () => zzfx(1, 0.05, 523.25, 0.02, 0.22, 0.35, 1, 1.8, 5, 2),
+  wrong: () => zzfx(1, 0.05, 220, 0, 0.12, 0.3, 1, 1.2, -8)
+};
+
+// ==========================================
+// 2. 音訊載入與播放管理 (88 個 Chirp 3 HD MP3)
+// ==========================================
+let activeAudio = null;
+let audioGeneration = 0;
+const audioMap = fetch('./audio/manifest.json')
+  .then(r => r.json())
+  .then(m => new Map(m.entries.filter(e => e.status === 'ready').map(e => [e.text, e.file])))
+  .catch(() => new Map());
+
+function stopSpeech() {
+  audioGeneration++;
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio.currentTime = 0;
+    activeAudio = null;
+  }
+}
+
+async function speak(text) {
+  stopSpeech();
+  const generation = audioGeneration;
+  if (isMuted) return;
+  const map = await audioMap;
+  if (generation !== audioGeneration) return;
+  const path = map.get(text);
+  if (!path) return;
+
+  const audio = new Audio(path);
+  activeAudio = audio;
+  try {
+    await audio.play();
+  } catch (e) {
+    console.warn('Audio play failed:', e);
+  }
+}
+
+// 監聽動物被點擊
+window.onAnimalClicked = (kind) => {
+  SFX.animalBoing();
+};
+
+let farm = createFarm();
+
+const teamNames = ['🌻 向日葵隊', '🌊 小河隊', '🌳 橡樹隊', '🍓 草莓隊'];
+let gameState = 'menu';
+let previousState = '';
+let deck = [];
+let currentIndex = 0;
+let teamScores = [];
+let attempts = 0;
+let records = [];
+let teamCount = 2;
+let showText = true;
+let choices = [];
+
+// ==========================================
+// 3. 遊戲流程與 HUD 更新
+// ==========================================
+function updateScoreboard() {
+  const currentTeam = currentIndex % teamCount;
+  const board = $('team-scoreboard');
+  board.innerHTML = '';
+
+  for (let i = 0; i < teamCount; i++) {
+    const chip = document.createElement('div');
+    chip.className = `team-chip ${i === currentTeam ? 'active-turn' : ''}`;
+    chip.innerHTML = `
+      <span>${teamNames[i]}</span>
+      <span class="team-stars">⭐ ${teamScores[i] || 0}</span>
+    `;
+    board.appendChild(chip);
+  }
+}
+
+function showToast(text, type = 'correct') {
+  const toast = $('feedback-toast');
+  toast.textContent = text;
+  toast.className = `feedback-toast show ${type}`;
+  setTimeout(() => toast.classList.remove('show'), 2400);
+}
+
+function startGame(customDeck) {
+  stopSpeech();
+  teamCount = Number($('setting-teams').value);
+  showText = $('setting-hints').value === 'show';
+  const rounds = Number($('setting-rounds').value);
+  const mode = $('setting-mode').value;
+
+  deck = customDeck || (mode === 'random' ? randomQuestions(rounds) : questions.slice(0, rounds));
+  currentIndex = 0;
+  teamScores = Array(teamCount).fill(0);
+  records = [];
+
+  $('modal-overlay').hidden = true;
+  farm?.pause(false);
+  loadQuestion();
+}
+
+function loadQuestion() {
+  gameState = 'playing';
+  attempts = 0;
+  stopSpeech();
+
+  $('teacher-bar').hidden = true;
+  const q = deck[currentIndex];
+
+  $('progress-pill').textContent = `救援進度 ${currentIndex + 1} / ${deck.length}`;
+  $('question-text').textContent = showText ? q.prompt : '🎧 仔細聽：問了哪些動物？';
+
+  updateScoreboard();
+  farm?.populate(q.animal, q.count);
+
+  // 隨機生成 3 個選項
+  const alternatives = Array.from({ length: 10 }, (_, i) => i + 1)
+    .filter(n => n !== q.count)
+    .sort((a, b) => Math.abs(a - q.count) - Math.abs(b - q.count));
+  choices = [q.count, ...alternatives.slice(0, 2)];
+  const rotate = (currentIndex + 1) % 3;
+  choices = choices.slice(rotate).concat(choices.slice(0, rotate));
+
+  const answersDeck = $('answers-deck');
+  answersDeck.innerHTML = '';
+
+  choices.forEach((n, idx) => {
+    const card = document.createElement('div');
+    card.className = 'answer-card';
+    card.innerHTML = `
+      <div class="answer-number">${n}</div>
+      <div class="answer-word">${words[n]}</div>
+      <span class="answer-key">按鍵 ${idx + 1}</span>
+    `;
+    card.onclick = () => submitAnswer(n, card);
+    answersDeck.appendChild(card);
+  });
+
+  speak(q.spokenPrompt);
+}
+
+function submitAnswer(n, cardElement) {
+  if (gameState !== 'playing') return;
+  attempts++;
+  const q = deck[currentIndex];
+
+  if (n !== q.count) {
+    // 答錯反饋 (Slapstick wrong feedback)
+    SFX.wrong();
+    showToast(`再仔細數一數！可以轉動牧場看看角落喔！`, 'wrong');
+    return;
+  }
+
+  // 答對反饋
+  gameState = 'feedback';
+  teamScores[currentIndex % teamCount]++;
+  records.push({
+    id: q.id,
+    firstCorrect: attempts === 1,
+    attempts,
+    spoken: false,
+    team: currentIndex % teamCount
+  });
+
+  updateScoreboard();
+  SFX.correct();
+
+  if (cardElement) cardElement.classList.add('correct');
+  $('answers-deck').querySelectorAll('.answer-card').forEach(c => c.style.pointerEvents = 'none');
+
+  showToast(`🎉 EXCELLENT! ${q.answer}`, 'correct');
+  $('question-text').textContent = q.answer;
+
+  // 顯示全班跟讀確認欄
+  $('teacher-bar').hidden = false;
+  farm?.celebrate();
+  speak(q.answer);
+}
+
+function proceedNext(spoken) {
+  if (gameState !== 'feedback') return;
+  if (records.length > 0) {
+    records[records.length - 1].spoken = spoken;
+  }
+  stopSpeech();
+  currentIndex++;
+  if (currentIndex < deck.length) {
+    loadQuestion();
+  } else {
+    finishGame();
+  }
+}
+
+function finishGame() {
+  gameState = 'results';
+  const correctCount = records.filter(r => r.firstCorrect).length;
+  const spokenCount = records.filter(r => r.spoken).length;
+
+  if (typeof confetti === 'function') {
+    confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
+  }
+
+  const overlay = $('modal-overlay');
+  const modal = $('modal-content');
+
+  const teamReportHtml = teamScores.map((s, i) => `
+    <div style="font-size:16px; margin: 4px 0;">${teamNames[i]}：<b>${s} 顆合作星 ⭐</b></div>
+  `).join('');
+
+  modal.innerHTML = `
+    <span class="modal-badge">RESCUE COMPLETED!</span>
+    <h2 class="modal-title">🎉 牧場動物全數平安脫困！</h2>
+    <p class="modal-desc">
+      全班合作完成 <b>${records.length}</b> 題救援<br>
+      首次答對率：<b>${correctCount} / ${records.length}</b>（${Math.round((correctCount / records.length) * 100)}%）<br>
+      全隊流利朗讀：<b>${spokenCount}</b> 題
+    </p>
+    <div style="background:#f1f5f9; padding: 14px; border-radius: 16px; margin-bottom: 20px;">
+      ${teamReportHtml}
+    </div>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button class="btn-start-game" id="btn-replay-all" style="margin:0;">再玩一輪 ↻</button>
+      <button class="btn-start-game" id="btn-review-wrong" style="margin:0; background:#38bdf8; color:#0c4a6e; box-shadow:0 8px 0 #0284c7;">練習錯題 💡</button>
+    </div>
+  `;
+
+  overlay.hidden = false;
+
+  $('btn-replay-all').onclick = () => location.reload();
+  $('btn-review-wrong').onclick = () => {
+    const wrongIds = new Set(records.filter(r => !r.firstCorrect).map(r => r.id));
+    if (wrongIds.size === 0) {
+      alert('太厲害了！本輪全部第一次答對，沒有錯題！');
+      return;
+    }
+    startGame(deck.filter(q => wrongIds.has(q.id)));
+  };
+}
+
+// 綁定 UI 事件
+$('btn-start-play').onclick = () => startGame();
+$('btn-speech-ok').onclick = () => proceedNext(true);
+$('btn-speech-skip').onclick = () => proceedNext(false);
+
+$('btn-replay-question').onclick = () => {
+  if (['playing', 'feedback'].includes(gameState) && deck[currentIndex]) {
+    speak(deck[currentIndex].spokenPrompt);
+  }
+};
+
+$('btn-cam-left').onclick = () => farm?.rotate(-0.25);
+$('btn-cam-right').onclick = () => farm?.rotate(0.25);
+$('btn-cam-center').onclick = () => farm?.resetView();
+
+$('btn-pause').onclick = () => togglePause();
+
+function togglePause() {
+  if (gameState === 'playing') {
+    gameState = 'paused';
+    farm?.pause(true);
+    const overlay = $('modal-overlay');
+    const modal = $('modal-content');
+    modal.innerHTML = `
+      <span class="modal-badge">GAME PAUSED</span>
+      <h2 class="modal-title">⏸️ 遊戲暫停中</h2>
+      <p class="modal-desc">老師可利用暫停時間引導學生複習動物名稱與數量問答。</p>
+      <div style="display:flex; gap:12px; justify-content:center;">
+        <button class="btn-start-game" id="btn-resume-game" style="margin:0;">繼續遊戲 ▶</button>
+        <button class="btn-start-game" id="btn-restart-game" style="margin:0; background:#f43f5e; color:#fff; box-shadow:0 8px 0 #be123c;">重新開始 ↻</button>
+      </div>
+    `;
+    overlay.hidden = false;
+    $('btn-resume-game').onclick = () => {
+      overlay.hidden = true;
+      farm?.pause(false);
+      gameState = 'playing';
+    };
+    $('btn-restart-game').onclick = () => {
+      location.reload();
+    };
+  } else if (gameState === 'paused') {
+    $('modal-overlay').hidden = true;
+    farm?.pause(false);
+    gameState = 'playing';
+  }
+}
+
+$('btn-mute').onclick = () => {
+  isMuted = !isMuted;
+  stopSpeech();
+  $('btn-mute').textContent = isMuted ? '🔇' : '♫';
+};
+
+$('btn-fullscreen').onclick = async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch (e) {}
+};
+
+// 鍵盤支援 (1, 2, 3 答題，R 聽音，P 暫停)
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if (['1', '2', '3'].includes(e.key)) {
+    const idx = Number(e.key) - 1;
+    if (choices[idx] !== undefined) {
+      const cards = $('answers-deck').children;
+      submitAnswer(choices[idx], cards[idx]);
+    }
+  }
+  if (e.key.toLowerCase() === 'r') $('btn-replay-question').click();
+  if (e.key.toLowerCase() === 'p') togglePause();
+});
+
+
