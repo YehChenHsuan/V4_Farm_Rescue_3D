@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -23,35 +23,40 @@
   <!-- 主機級 3D 遊戲 HUD 覆蓋層 -->
   <div class="game-hud">
     
-    <!-- 頂部導航狀態列 -->
-    <header class="hud-header">
-      <!-- 品牌標題 -->
-      <div class="hud-brand hud-interactive">
-        <span class="brand-icon">🚜</span>
-        <div class="brand-title">FARM RESCUE 3D</div>
-        <span class="brand-sub">V4 · p.10–11</span>
-      </div>
+    <!-- 頂部區塊：整合 Header 與 隊伍計分欄，避免遮擋中央 3D 視野 -->
+    <div class="hud-top-section">
+      <!-- 頂部導航狀態列 -->
+      <header class="hud-header">
+        <!-- 品牌標題 -->
+        <div class="hud-brand hud-interactive">
+          <span class="brand-icon">🚜</span>
+          <div class="brand-title">FARM RESCUE 3D</div>
+          <span class="brand-sub">V4 · p.10–11</span>
+        </div>
 
-      <!-- 中央題目問題橫幅 -->
-      <div class="hud-question-capsule hud-interactive" id="question-capsule">
-        <div class="question-text" id="question-text">How many animals do you see?</div>
-        <button class="question-replay-btn" id="btn-replay-question">
-          <span>📢 聽題目 (R)</span>
-        </button>
-      </div>
+        <!-- 中央題目問題橫幅 (大字體、超醒目) -->
+        <div class="hud-question-capsule hud-interactive" id="question-capsule">
+          <div class="question-text" id="question-text">How many animals do you see?</div>
+          <button class="question-replay-btn" id="btn-replay-question">
+            <span>📢 聽題目 (R)</span>
+          </button>
+        </div>
 
-      <!-- 右側題目進度與控制群組 -->
-      <div class="hud-controls-group hud-interactive">
-        <div class="hud-pill highlight" id="progress-pill">救援進度 1 / 8</div>
-        <button class="hud-btn" id="btn-mute" title="語音開關">♫</button>
-        <button class="hud-btn" id="btn-pause" title="暫停遊戲">Ⅱ</button>
-        <button class="hud-btn" id="btn-fullscreen" title="全螢幕切換">⛶</button>
-      </div>
-    </header>
+        <!-- 右側題目進度與控制群組 -->
+        <div class="hud-controls-group hud-interactive">
+          <div class="hud-pill highlight" id="progress-pill">救援進度 1 / 8</div>
+          <button class="hud-btn hud-btn-speed" id="btn-speed" title="點擊切換語速">⚡ 1.0x</button>
+          <button class="hud-btn" id="btn-home" title="結束遊戲，回主選單">🏠</button>
+          <button class="hud-btn" id="btn-mute" title="語音開關">♫</button>
+          <button class="hud-btn" id="btn-pause" title="暫停遊戲 (P)">Ⅱ</button>
+          <button class="hud-btn" id="btn-fullscreen" title="全螢幕切換">⛶</button>
+        </div>
+      </header>
 
-    <!-- 隊伍計分展示欄 (2-4 隊動態切換) -->
-    <div class="team-scoreboard hud-interactive" id="team-scoreboard">
-      <!-- 由 JS 動態生成隊伍指示膠囊 -->
+      <!-- 隊伍計分展示欄 (A~C 組輪流與搶答互動) -->
+      <div class="team-scoreboard hud-interactive" id="team-scoreboard">
+        <!-- 由 JS 動態生成隊伍指示膠囊 -->
+      </div>
     </div>
 
     <!-- 底部操作區：3D 視角羅盤 + 巨大 3D 數字答案卡 + 教師跟讀確認列 -->
@@ -102,9 +107,17 @@
         <div class="setting-item">
           <label>競賽隊伍</label>
           <select class="setting-select" id="setting-teams">
-            <option value="2">2 隊（向日葵 / 小河）</option>
-            <option value="3">3 隊（向日葵 / 小河 / 橡樹）</option>
-            <option value="4">4 隊（四隊合作大挑戰）</option>
+            <option value="3" selected>3 隊（Team A / Team B / Team C）</option>
+            <option value="2">2 隊（Team A / Team B）</option>
+            <option value="4">4 隊（Team A / Team B / Team C / Team D）</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>朗讀語速</label>
+          <select class="setting-select" id="setting-speed">
+            <option value="1.0" selected>⚡ 標準語速 (1.0x)</option>
+            <option value="0.8">🐢 慢速跟讀 (0.8x)</option>
+            <option value="1.2">🐇 挑戰快節奏 (1.2x)</option>
           </select>
         </div>
         <div class="setting-item">

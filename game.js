@@ -52,6 +52,8 @@ function stopSpeech() {
   }
 }
 
+let playbackRate = 1.0;
+
 async function speak(text) {
   stopSpeech();
   const generation = audioGeneration;
@@ -62,6 +64,7 @@ async function speak(text) {
   if (!path) return;
 
   const audio = new Audio(path);
+  audio.playbackRate = playbackRate;
   activeAudio = audio;
   try {
     await audio.play();
@@ -77,7 +80,7 @@ window.onAnimalClicked = (kind) => {
 
 let farm = createFarm();
 
-const teamNames = ['🌻 向日葵隊', '🌊 小河隊', '🌳 橡樹隊', '🍓 草莓隊'];
+const teamNames = ['Team A', 'Team B', 'Team C', 'Team D'];
 let gameState = 'menu';
 let previousState = '';
 let deck = [];
@@ -85,42 +88,107 @@ let currentIndex = 0;
 let teamScores = [];
 let attempts = 0;
 let records = [];
-let teamCount = 2;
+let teamCount = 3;
 let showText = true;
 let choices = [];
+
+// 輪流與搶答狀態管理
+let scheduledTurnTeam = 0;  // 本題輪流順序的主答組
+let activeAnsweringTeam = 0; // 目前按鍵作答的組 (可為搶答組)
+let isStealMode = false;     // 是否已解鎖搶答
 
 // ==========================================
 // 3. 遊戲流程與 HUD 更新
 // ==========================================
 function updateScoreboard() {
-  const currentTeam = currentIndex % teamCount;
   const board = $('team-scoreboard');
   board.innerHTML = '';
 
   for (let i = 0; i < teamCount; i++) {
     const chip = document.createElement('div');
-    chip.className = `team-chip ${i === currentTeam ? 'active-turn' : ''}`;
-    chip.innerHTML = `
-      <span>${teamNames[i]}</span>
-      <span class="team-stars">⭐ ${teamScores[i] || 0}</span>
-    `;
+    const isCurrent = (i === activeAnsweringTeam);
+
+    if (isStealMode) {
+      if (isCurrent) {
+        chip.className = 'team-chip stealing-now';
+        chip.innerHTML = `
+          <span>🔥 ${teamNames[i]} 搶答中</span>
+          <span class="team-stars">⭐ ${teamScores[i] || 0}</span>
+        `;
+      } else {
+        chip.className = 'team-chip can-steal';
+        chip.innerHTML = `
+          <span>⚡ ${teamNames[i]} 搶答！</span>
+          <span class="team-stars">⭐ ${teamScores[i] || 0}</span>
+        `;
+        chip.title = `點擊指派 ${teamNames[i]} 搶答此題`;
+        chip.onclick = () => selectStealTeam(i);
+      }
+    } else {
+      chip.className = `team-chip ${isCurrent ? 'active-turn' : ''}`;
+      chip.innerHTML = `
+        <span>${isCurrent ? '👉 ' : ''}${teamNames[i]}</span>
+        <span class="team-stars">⭐ ${teamScores[i] || 0}</span>
+      `;
+    }
     board.appendChild(chip);
   }
+}
+
+function selectStealTeam(teamIndex) {
+  if (!isStealMode || gameState !== 'playing') return;
+  SFX.click();
+  activeAnsweringTeam = teamIndex;
+  updateScoreboard();
+  showToast(`✋ ${teamNames[teamIndex]} 獲得搶答權！請選擇答案卡！`, 'correct');
+  // 重新解鎖卡牌點擊
+  $('answers-deck').querySelectorAll('.answer-card').forEach(c => c.style.pointerEvents = 'auto');
 }
 
 function showToast(text, type = 'correct') {
   const toast = $('feedback-toast');
   toast.textContent = text;
   toast.className = `feedback-toast show ${type}`;
-  setTimeout(() => toast.classList.remove('show'), 2400);
+  setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+function updateSpeedBtn() {
+  const btn = $('btn-speed');
+  if (!btn) return;
+  if (playbackRate === 1.0) {
+    btn.textContent = '⚡ 1.0x';
+    btn.title = '目前語速：標準 (點擊切換)';
+  } else if (playbackRate === 0.8) {
+    btn.textContent = '🐢 0.8x';
+    btn.title = '目前語速：慢速 (點擊切換)';
+  } else {
+    btn.textContent = '🐇 1.2x';
+    btn.title = '目前語速：快節奏 (點擊切換)';
+  }
+}
+
+function cycleSpeed() {
+  SFX.click();
+  if (playbackRate === 1.0) {
+    playbackRate = 0.8;
+  } else if (playbackRate === 0.8) {
+    playbackRate = 1.2;
+  } else {
+    playbackRate = 1.0;
+  }
+  updateSpeedBtn();
 }
 
 function startGame(customDeck) {
   stopSpeech();
-  teamCount = Number($('setting-teams').value);
+  teamCount = Number($('setting-teams').value) || 3;
   showText = $('setting-hints').value === 'show';
   const rounds = Number($('setting-rounds').value);
   const mode = $('setting-mode').value;
+  if ($('setting-speed')) {
+    playbackRate = Number($('setting-speed').value) || 1.0;
+    updateSpeedBtn();
+  }
 
   deck = customDeck || (mode === 'random' ? randomQuestions(rounds) : questions.slice(0, rounds));
   currentIndex = 0;
@@ -136,6 +204,11 @@ function loadQuestion() {
   gameState = 'playing';
   attempts = 0;
   stopSpeech();
+
+  // 每一題固定依照輪流排程，初始主答隊伍為 currentIndex % teamCount
+  scheduledTurnTeam = currentIndex % teamCount;
+  activeAnsweringTeam = scheduledTurnTeam;
+  isStealMode = false;
 
   $('teacher-bar').hidden = true;
   const q = deck[currentIndex];
@@ -178,21 +251,31 @@ function submitAnswer(n, cardElement) {
   const q = deck[currentIndex];
 
   if (n !== q.count) {
-    // 答錯反饋 (Slapstick wrong feedback)
+    // 答錯反饋：解鎖搶答模式
     SFX.wrong();
-    showToast(`再仔細數一數！可以轉動牧場看看角落喔！`, 'wrong');
+    if (!isStealMode) {
+      isStealMode = true;
+      showToast(`❌ ${teamNames[activeAnsweringTeam]} 答錯！該題解鎖！請老師點選搶答組別 ✋`, 'wrong');
+      // 暫時鎖定答案卡，等待老師點選搶答組別
+      $('answers-deck').querySelectorAll('.answer-card').forEach(c => c.style.pointerEvents = 'none');
+    } else {
+      showToast(`❌ ${teamNames[activeAnsweringTeam]} 搶答亦答錯！可再點選其他組別搶答 ✋`, 'wrong');
+      $('answers-deck').querySelectorAll('.answer-card').forEach(c => c.style.pointerEvents = 'none');
+    }
+    updateScoreboard();
     return;
   }
 
   // 答對反饋
   gameState = 'feedback';
-  teamScores[currentIndex % teamCount]++;
+  teamScores[activeAnsweringTeam]++;
   records.push({
     id: q.id,
     firstCorrect: attempts === 1,
     attempts,
     spoken: false,
-    team: currentIndex % teamCount
+    team: activeAnsweringTeam,
+    wasStolen: (activeAnsweringTeam !== scheduledTurnTeam)
   });
 
   updateScoreboard();
@@ -201,7 +284,12 @@ function submitAnswer(n, cardElement) {
   if (cardElement) cardElement.classList.add('correct');
   $('answers-deck').querySelectorAll('.answer-card').forEach(c => c.style.pointerEvents = 'none');
 
-  showToast(`🎉 EXCELLENT! ${q.answer}`, 'correct');
+  if (activeAnsweringTeam !== scheduledTurnTeam) {
+    showToast(`🎉 搶答成功！${teamNames[activeAnsweringTeam]} 奪得 1 顆合作星！`, 'correct');
+  } else {
+    showToast(`🎉 EXCELLENT! ${teamNames[activeAnsweringTeam]} 答對 +1 顆星！`, 'correct');
+  }
+  
   $('question-text').textContent = q.answer;
 
   // 顯示全班跟讀確認欄
@@ -216,6 +304,7 @@ function proceedNext(spoken) {
     records[records.length - 1].spoken = spoken;
   }
   stopSpeech();
+  // 換下一題：自動恢復原本排定的下一隊 (currentIndex + 1) % teamCount
   currentIndex++;
   if (currentIndex < deck.length) {
     loadQuestion();
@@ -285,6 +374,37 @@ $('btn-cam-left').onclick = () => farm?.rotate(-0.25);
 $('btn-cam-right').onclick = () => farm?.rotate(0.25);
 $('btn-cam-center').onclick = () => farm?.resetView();
 
+// 語速切換與回到首頁按鈕
+if ($('btn-speed')) $('btn-speed').onclick = () => cycleSpeed();
+if ($('btn-home')) $('btn-home').onclick = () => confirmReturnHome();
+
+function confirmReturnHome() {
+  if (gameState === 'menu') return;
+  stopSpeech();
+  farm?.pause(true);
+  const overlay = $('modal-overlay');
+  const modal = $('modal-content');
+  modal.innerHTML = `
+    <span class="modal-badge">RETURN TO MENU</span>
+    <h2 class="modal-title">🏠 結束本輪並回到首頁？</h2>
+    <p class="modal-desc">
+      目前進行到第 <b>${currentIndex + 1} / ${deck.length}</b> 題。<br>
+      回到首頁可以重新設定參賽隊伍、語速與挑戰題數！
+    </p>
+    <div style="display:flex; gap:14px; justify-content:center; margin-top:20px;">
+      <button class="btn-start-game" id="btn-confirm-home" style="margin:0; background:#f43f5e; box-shadow:0 8px 0 #be123c;">確定回首頁 🏠</button>
+      <button class="btn-start-game" id="btn-cancel-home" style="margin:0;">繼續遊戲 ▶</button>
+    </div>
+  `;
+  overlay.hidden = false;
+
+  $('btn-confirm-home').onclick = () => location.reload();
+  $('btn-cancel-home').onclick = () => {
+    overlay.hidden = true;
+    farm?.pause(false);
+  };
+}
+
 $('btn-pause').onclick = () => togglePause();
 
 function togglePause() {
@@ -331,7 +451,7 @@ $('btn-fullscreen').onclick = async () => {
   } catch (e) {}
 };
 
-// 鍵盤支援 (1, 2, 3 答題，R 聽音，P 暫停)
+// 鍵盤支援 (1, 2, 3 答題，R 聽音，P 暫停，H 回首頁，S 切換語速)
 window.addEventListener('keydown', (e) => {
   if (e.repeat || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   if (['1', '2', '3'].includes(e.key)) {
@@ -343,6 +463,8 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key.toLowerCase() === 'r') $('btn-replay-question').click();
   if (e.key.toLowerCase() === 'p') togglePause();
+  if (e.key.toLowerCase() === 's') cycleSpeed();
+  if (e.key.toLowerCase() === 'h') confirmReturnHome();
 });
 
 

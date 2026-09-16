@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    FARM RESCUE 3D · 牧場救援隊 (Console-Grade 3D Arcade)
    遵照《兒童美語 3D 互動遊戲開發指南》打造：視窗鎖死 + 滿版 3D + 糖果打擊感
    ========================================================================== */
@@ -140,56 +140,73 @@ canvas:active {
   border-radius: 12px;
 }
 
-/* 中央題目問句橫幅 (Question Banner) */
+/* 頂部整合容器 */
+.hud-top-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 6px;
+  pointer-events: none;
+}
+
+/* 中央題目問句橫幅 (大字體高清晰度 Question Banner) */
 .hud-question-capsule {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border: 4px solid #f59e0b;
-  border-radius: 26px;
-  padding: 12px 32px;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35), 0 6px 0 #b45309;
+  background: linear-gradient(180deg, #ffffff 0%, #fefce8 100%);
+  border: 5px solid #f59e0b;
+  border-radius: 30px;
+  padding: 12px 38px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 8px 0 #b45309;
   text-align: center;
   color: #1e293b;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 20px;
   pointer-events: auto;
   animation: popIn 0.3s var(--ease-spring);
+  min-width: 540px;
+  max-width: 880px;
 }
 
 .question-text {
   font-family: var(--font-game);
-  font-size: 28px;
-  letter-spacing: 0.5px;
-  color: #92400e;
-  line-height: 1.1;
+  font-size: clamp(28px, 3.4vw, 42px);
+  letter-spacing: 0.6px;
+  color: #78350f;
+  line-height: 1.15;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .question-replay-btn {
-  background: var(--c-primary);
-  border: none;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  border: 2px solid #a7f3d0;
   color: #fff;
   border-radius: 9999px;
-  padding: 8px 16px;
+  padding: 10px 20px;
   font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 800;
+  font-size: 15px;
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4), 0 3px 0 #047857;
   transition: transform 0.15s, background 0.2s;
+  white-space: nowrap;
 }
 .question-replay-btn:hover {
-  background: var(--c-primary-dark);
-  transform: scale(1.06);
+  transform: scale(1.06) translateY(-2px);
+}
+.question-replay-btn:active {
+  transform: scale(0.96) translateY(2px);
+  box-shadow: 0 1px 0 #047857;
 }
 
 /* 右側隊伍與控制群組 */
 .hud-controls-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .hud-pill {
@@ -235,37 +252,81 @@ canvas:active {
   transform: scale(0.92);
 }
 
+.hud-btn.hud-btn-speed {
+  width: auto;
+  padding: 0 14px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border-color: #7dd3fc;
+  color: #f0f9ff;
+}
+
 /* ==========================================
-   隊伍計分展示欄 (Team Score Bar)
+   隊伍計分展示欄 (Team Score Bar) - 移至頂部且支援搶答點選
    ========================================== */
 .team-scoreboard {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 4px;
+  z-index: 12;
 }
 
 .team-chip {
-  background: var(--c-hud-bg);
+  background: rgba(15, 23, 42, 0.82);
   backdrop-filter: blur(12px);
-  padding: 6px 16px;
-  border-radius: 16px;
-  border: 2px solid transparent;
+  padding: 6px 18px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   color: #e2e8f0;
-  transition: transform 0.2s var(--ease-spring), border-color 0.2s, background 0.2s;
+  transition: all 0.25s var(--ease-spring);
+  user-select: none;
 }
 
+/* 輪流正常主答中 */
 .team-chip.active-turn {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.45) 0%, rgba(15, 23, 42, 0.9) 100%);
-  border-color: #f59e0b;
-  color: #fef08a;
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.85) 0%, rgba(180, 83, 9, 0.95) 100%);
+  border-color: #fef08a;
+  color: #ffffff;
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.55), 0 3px 0 #92400e;
+}
+
+/* 答錯時，其他隊伍解鎖可搶答 */
+.team-chip.can-steal {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.35) 0%, rgba(15, 23, 42, 0.88) 100%);
+  border: 2px dashed #f87171;
+  color: #fecaca;
+  cursor: pointer;
+  animation: pulseSteal 1s infinite alternate;
+}
+.team-chip.can-steal:hover {
+  transform: scale(1.1) translateY(-2px);
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.6);
+  color: #fff;
+}
+
+/* 當前搶答隊伍中 */
+.team-chip.stealing-now {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  border-color: #fecdd3;
+  color: #ffffff;
+  transform: scale(1.12);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.65), 0 3px 0 #991b1b;
+}
+
+@keyframes pulseSteal {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  100% { transform: scale(1.04); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
 
 .team-stars {

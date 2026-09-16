@@ -196,7 +196,7 @@ export function createFarm() {
       const g = animal(kind);
       const row = Math.floor(i / 5);
       const n = Math.min(5, count - row * 5);
-      g.position.set((i % 5 - (n - 1) / 2) * 2.3, 0, row * 2.8 - (rows - 1) * 1.4 + 0.8);
+      g.position.set((i % 5 - (n - 1) / 2) * 2.2, 0, row * 2.5 - (rows - 1) * 1.25 + 1.2);
       
       // 出場彈跳縮放 (Spawn Animation)
       g.scale.set(0.01, 0.01, 0.01);
@@ -261,8 +261,8 @@ export function createFarm() {
 
     // 平滑視角旋轉 (Lerp Angle)
     currentAngle += (targetAngle - currentAngle) * 0.1;
-    camera.position.set(Math.sin(currentAngle) * 21, 14, Math.cos(currentAngle) * 21);
-    camera.lookAt(0, 0.5, 0);
+    camera.position.set(Math.sin(currentAngle) * 22, 14.5, Math.cos(currentAngle) * 22);
+    camera.lookAt(0, 0.2, 0);
 
     // 風車轉動
     blades.rotation.z += 0.015;
